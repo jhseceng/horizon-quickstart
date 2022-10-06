@@ -1,0 +1,22 @@
+// Replace the <n> in each row to specify the number of resources used in this deployment. Remove the rows for resources that aren’t used.
+|===
+|Resource |This deployment uses
+
+// Space needed to maintain table headers
+|AWS CloudFormation stacks | 1
+|AWS CloudFormation StackSets | 3
+|AWS CloudFormation StackSet instances | All org accounts^1^
+|AWS Lambda functions| 1^2^
+|IAM roles | 1
+|IAM managed policies | 1^3^
+|Event Bridge Rules| 1^4^
+
+|===
+
+^1^ [.small]#This Quick Start deploys and maintains StackSet instances for each AWS account that you include in the deployment.#
+
+^2^ [.small]#Tha lambda function is a custom resource used to register the org with CrowdStrike.#
+
+^3^ [.small]#This Quick Start deploys a cross-account trust IAM role and associated managed policy for {partner-product-short-name} on each AWS account that you include in the deployment.#
+
+^4^ [.small]#This Quick Start event bridge rules for  {partner-product-short-name} on each AWS account in each enabled region that you include in the deployment.#

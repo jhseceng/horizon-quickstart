@@ -1,0 +1,8 @@
+// Include details about any licenses and how to sign up. Provide links as appropriate. If no licenses are required, clarify that. The following paragraphs provide examples of details you can provide. Remove italics, and rephrase as appropriate.
+
+
+
+
+This Quick Start requires that you have access to a CrowdStrike account.  If you do not currently have a CrowdStrike account you can find more details of how to create one here.
+
+https://aws.amazon.com/marketplace/pp/prodview-l6ti2ml2i2g6y?sr=0-2&ref_=beagle&applicationId=AWSMPContessa

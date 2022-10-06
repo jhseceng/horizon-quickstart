@@ -1,0 +1,23 @@
+:xrefstyle: short
+
+Deploying this Quick Start for a new virtual private cloud (VPC) with
+default parameters builds the following _{partner-product-name}_ environment in the
+AWS Cloud.
+
+[#CrowdStrike-CT-arch]
+.{partner-product-short-name} architecture diagram
+image::../images/CrowdStrike-CT-arch.png[CrowdStrike AWS Control Tower Integration diagram, 100%]
+
+The Quick Start sets up the following:
+
+Two Service Managed Stacksets that should be applied to each member account in your org. (Excluding the master account)
+
+* Service Managed StackSet containing an IAM role that CrowdStrike will assume in order to monitor assets.
+* Service Managed StackSet containing EventBridge rules that should be applied in each active region.
+
+In addtionn the following resources are created for your master account
+
+* IAM role that CrowdStrike will assume in order to monitor assets in your master account
+* EventBridge rules in each active region in your master account
+
+

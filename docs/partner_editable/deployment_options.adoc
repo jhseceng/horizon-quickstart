@@ -1,0 +1,33 @@
+
+This Quick Start can be deployed as an AWS CloudFormation stack in your AWS Control Tower management account.
+
+WARNING: .
+
+Each member account requires the following cloudformation stacks and stacksets
+
+|===
+|Resource Type |Permissions Model|Name|Location|Description
+
+// Space needed to maintain table headers
+|Cloudformation Stack |SELF-MANAGED| CrowdStrike-CSPM-Integration| Master Account
+|Creates an IAM Role used by CrowdStrike to discover resources
+
+|Cloudformation StackSet | SERVICE-MANAGED|CrowdStrike-CSPM-Integration-Root-EB| Master Account
+|Creates Event Bridge forwarding rules in each every enabled region in the master account
+
+|Cloudformation StackSet | SERVICE-MANAGED|CrowdStrike-CSPM-Integration| All Org Member Accounts
+|Creates an IAM Role used by CrowdStrike to discover resources
+
+|Cloudformation StackSet | SERVICE-MANAGED|CrowdStrike-CSPM-Integration-EB| All Org Member Accounts
+|Creates an IAM Role used by CrowdStrike to discover resources
+|===
+
+
+== Operations
+
+=== New Accounts
+* An account administrator enrolls new or existing AWS accounts in AWS Control Tower, which generates a https://docs.aws.amazon.com/controltower/latest/userguide/lifecycle-events.html[lifecycle event^].
+* With automatic deployment enabled, The CrowdStrike StackSets automatically deploys to accounts that are added to the target organization or organizational units (OUs) in the future.
+
+=== Existing Accounts
+* An account administrator can create a stack instance in existing accounts using  https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-concepts.html#stacksets-concepts-ops[this procedure^]

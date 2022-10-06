@@ -1,0 +1,8 @@
+The {partner-product-short-name} Quick Start allows you to scale the observability
+of your AWS Control Tower managed landing zones with CrowdStrike.
+
+* {partner-product-short-name} delivers continuous agentless discovery and visibility of cloud-native assets from the host to the cloud, providing valuable context and insights into the overall security posture and the actions required to prevent potential security incidents.
+
+* {partner-product-short-name} provides intelligent agentless monitoring of cloud resources to detect misconfigurations, vulnerabilities and security threats, along with guided remediation to resolve security risks and enable developers with guardrails to avoid costly mistakes.
+
+* {partner-product-short-name} adversary-focused approach provides real-time threat intelligence on 150+ adversary groups, 50+ IOA detections and guided remediation that improves investigation speed by up to 88%, enabling teams to respond faster and stop breaches.
