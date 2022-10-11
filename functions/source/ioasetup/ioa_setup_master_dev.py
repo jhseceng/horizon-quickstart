@@ -14,14 +14,30 @@ CLOUDTRAIL_NAME = 'cs-horizon-org-trail'
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-
+push_master_stackset = os.environ["CreateStackSet"]
 admin_role_arn = os.environ["AdministrationRoleARN"]
 exec_role_arn = os.environ["ExecutionRoleARN"]
 aws_region = os.environ["AWSRegion"]
 ioa_enabled = os.environ["EnableIOA"]
 use_existing_cloudtrail = os.environ["UseExistingCloudtrail"]
+region_list = os.environ['RegionList'].split(',')
 
 
+def get_master_id():
+    """ Get the master Id from AWS Organization """
+    ORG = boto3.client('organizations')
+    try:
+        master_id = ORG.list_roots()['Roots'][0]['Arn'].rsplit(':')[4]
+        return master_id
+    except Exception as e:
+        logger.error('This stack runs only on the Master of the AWS Organization: Error {}'.format(e))
+        return False
+
+
+def get_regions():
+    ec2_client = boto3.client('ec2')
+    regions = [region['RegionName'] for region in ec2_client.describe_regions()['Regions']]
+    return regions
 
 
 def create_self_managed_stackset(stack_set_name, role_descriiption, template_url, admin_role_arn, paramlist,
@@ -47,6 +63,41 @@ def create_self_managed_stackset(stack_set_name, role_descriiption, template_url
             else:
                 logger.error("Unexpected error: %s" % e)
                 return
+
+
+def create_stack_instances(stackset_name, account_id, regions):
+    """ Create CRWD Horizon Stackset on the Master Account """
+    logger.info('regions type {}'.format(type(regions)))
+    client_cft = boto3.client('cloudformation')
+    result = {}
+    try:
+        if regions:
+            client_cft.create_stack_instances(
+                StackSetName=stackset_name,
+                OperationPreferences={
+                    'RegionConcurrencyType': 'PARALLEL',
+                    'FailureTolerancePercentage': 100,
+                    'MaxConcurrentCount': 20,
+                },
+                Accounts=[account_id],
+                Regions=list(regions)
+            )
+            logger.info('Processed {} Sucessfully'.format(stackset_name))
+            return True
+        else:
+            logger.info('Found no active regions to apply stackset {}'.format(stackset_name))
+            return False
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'NameAlreadyExistsException':
+            logger.info("StackSet already exists")
+            result['StackSetName'] = 'CRWD-ROLES-CREATION'
+        else:
+            logger.error("Unexpected error: %s" % e)
+            result['Status'] = e
+        return False
+    except Exception as e:
+        logger.error('Unable to create stack :{}, REASON: {}'.format(stackset_name, e))
+        return False
 
 
 def delete_stackset(account, stackset_name):
@@ -161,7 +212,7 @@ def lambda_handler(event, context):
         iam_stackset_url = event['ResourceProperties']["IAMStackSetURL"]
         iam_stackset_name = event['ResourceProperties']["IAMStackSetName"]
 
-
+        # account_id = get_master_id()
         logger.info('EVENT Received: {}'.format(event))
         keys = event['ResourceProperties'].keys()
         iam_stackset_param_list = []
@@ -181,7 +232,7 @@ def lambda_handler(event, context):
         #
         # Get this account ID
         #
-
+        account_id = get_master_id()
         response_data = {}
         clist = ['CAPABILITY_NAMED_IAM']
         if event['RequestType'] in ['Create']:
@@ -190,9 +241,17 @@ def lambda_handler(event, context):
             #
             if ioa_enabled == 'true':
                 desc = 'Create EventBridge rule in child accounts in every region to send CloudTrail events to CrowdStrike'
-                stack_op_result = create_self_managed_stackset(iam_stackset_name, desc, iam_stackset_url, admin_role_arn,
+                create_self_managed_stackset(iam_stackset_name, desc, iam_stackset_url, admin_role_arn,
                                              iam_stackset_param_list,
                                              exec_role_arn, clist)
+                if push_master_stackset == 'true':
+                    logger.info('**** Creating StackInstances in regions {} ****'.format(region_list))
+                    stack_op_result = create_stack_instances(iam_stackset_name, account_id, region_list)
+                    logger.info('stack_op_result: {}'.format(stack_op_result))
+                else:
+                    # Skip deployment of Stackset in master
+                    logger.info('**** Skipping push of stack instances in regions ****')
+                    stack_op_result = True
                 #
                 # Create org wide trail if required.
                 #
@@ -205,7 +264,7 @@ def lambda_handler(event, context):
                 if stack_op_result and cloudtrail_result:
                     cfnresponse_send(event, context, 'SUCCESS', response_data, "CustomResourcePhysicalID")
                 else:
-                    logger.info('Failed to apply stackset {}'.format(iam_stackset_name))
+                    logger.info('Failed to apply stackset {}'.format(ioa_stackset_root))
                     cfnresponse_send(event, context, 'SUCCESS', response_data, "CustomResourcePhysicalID")
 
         elif event['RequestType'] in ['Update']:
@@ -231,3 +290,6 @@ def lambda_handler(event, context):
         response_data = {"Status": str(e)}
         cfnresponse_send(event, context, 'FAILED', response_data, "CustomResourcePhysicalID")
         return
+
+
+

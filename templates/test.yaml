@@ -1,0 +1,724 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This template will create 3 StackSets and one Stack in your master account.
+  1) Cloudformation Stack CrowdStrike-CSPM-Integration will be created in the master account
+  2) Cloudformation StackSet CrowdStrike-CSPM-Integration-Root-EB will be created and applied to all active regions in the
+  master account
+  The below StackSets are created as SERVICE_MANAGED StackSets so that they are automatically applied to new accounts
+  created in your organisation.   Administrators should apply these manually to existing accounts.
+  3) Cloudformation StackSet CrowdStrike-CSPM-Integration will be created in the master account.
+  4) CrowdStrike-CSPM-Integration-EB will be created in the master account
+Metadata:
+  cfn-lint:
+    config:
+      ignore_checks:
+        - E3002 # Concurrency for StackSet
+        - W1001 # Resource not required if not using IOA Scanning
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: CrowdStrike Falcon API keys. (From CrowdStrike Console)
+        Parameters:
+          - FalconClientID
+          - FalconSecret
+          - CSCloud
+      - Label:
+          default: Disable Indicator of Attack Scanning (Does not create EventBridge Rules)
+        Parameters:
+          - EnableIOA
+          - UseExistingCloudtrail
+      - Label:
+          default: AWS Quick Start configuration
+        Parameters:
+          - QSS3BucketName
+          - QSS3KeyPrefix
+      - Label:
+          default: Control Tower Params
+        Parameters:
+          - ctStackSetAdminRole
+          - executionRoleArn
+    ParameterLabels:
+      
+      QSS3BucketName:
+        default: Quick Start S3 bucket name
+      QSS3KeyPrefix:
+        default: Quick Start S3 key prefix
+      FalconClientID:
+        default: Falcon API Key Client ID
+      FalconSecret:
+        default: Falcon API Key Secret
+      EnableIOA:
+        default: Enable IOA Scanning
+      UseExistingCloudtrail:
+        default: Disable sending cloudtrail events to CrowdStrike
+      CSCloud:
+        default: CrowdStrike Cloud
+Conditions:
+  ShouldCreateIOAResources: !Equals [ !Ref 'EnableIOA', true ]
+  UsingDefaultBucket: !Equals [ !Ref QSS3BucketName, 'aws-quickstart' ]
+Parameters:
+  ctStackSetAdminRole:
+    Type: String
+    Default: AWSControlTowerStackSetRole
+  executionRoleArn:
+    Type: String
+    Default: AWSControlTowerExecution
+  bucket:
+    Type: String
+  FalconClientID:
+    Description: Your Falcon OAuth2 Client ID.
+    NoEcho: 'true'
+    Type: String
+  FalconSecret:
+    Description: Your Falcon OAuth2 API Secret.
+    NoEcho: 'true'
+    Type: String
+  CSCloud:
+    Type: String
+    Default: us1
+    AllowedValues: [ "us1", "us2", "eu1" ]
+    Description: CrowdStrike Cloud
+  EnableIOA:
+    Type: String
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Default: 'true'
+  QSS3BucketName:
+    AllowedPattern: ^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$
+    ConstraintDescription: Quick Start bucket name can include numbers, lowercase
+      letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen
+      (-).
+    Default: aws-quickstart
+    Description: S3 bucket name for the Quick Start assets. This string can include
+      numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start
+      or end with a hyphen (-).
+    Type: String
+  QSS3KeyPrefix:
+    AllowedPattern: ^[0-9a-zA-Z-/]*$
+    ConstraintDescription: Quick Start key prefix can include numbers, lowercase letters,
+      uppercase letters, hyphens (-), and forward slash (/).
+    Default: quickstart-crowdstrike-horizon/
+    Description: S3 key prefix for the Quick Start assets. Quick Start key prefix
+      can include numbers, lowercase letters, uppercase letters, hyphens (-), and
+      forward slash (/).
+    Type: String
+  UseExistingCloudtrail:
+    Description: When set to false, a CloudTrail resource is created which allows
+      Horizon to consume non-mutating API events
+    Type: String
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Default: 'true'
+
+Mappings:
+  CrowdStrikeCSPMRoleTemplateURL:
+    us1:
+      CSAccountNumber: "292230061137"
+      StackName: "CrowdStrike-CSPM-Integration"
+      StackNameEb: "CrowdStrike-CSPM-Integration-EB"
+      StackNameRootEb: "CrowdStrike-CSPM-Integration-Root-EB"
+      CSRoleName: "CrowdStrikeCSPMConnector"
+      cf: "https://cs-prod-cloudconnect-templates.s3.amazonaws.com/aws_cspm_cloudformation_v2.json"
+      cfiam: "https://cs-prod-cloudconnect-templates.s3.amazonaws.com/aws_cspm_cloudformation_iam_v2.json"
+      cfeb: "https://cs-prod-cloudconnect-templates.s3.amazonaws.com/aws_cspm_cloudformation_eb_v2.json"
+    us2:
+      CSAccountNumber: "292230061137"
+      StackName: "CrowdStrike-CSPM-Integration"
+      StackNameEb: "CrowdStrike-CSPM-Integration-EB"
+      StackNameRootEb: "CrowdStrike-CSPM-Integration-Root-EB"
+      CSRoleName: "CrowdStrikeCSPMConnector"
+      cf: "https://cs-prod-cloudconnect-templates.s3.amazonaws.com/aws_cspm_cloudformation_v2.json"
+      cfiam: "https://cs-prod-cloudconnect-templates.s3.amazonaws.com/aws_cspm_cloudformation_iam_v2.json"
+      cfeb: "https://cs-prod-cloudconnect-templates.s3.amazonaws.com/aws_cspm_cloudformation_eb_v2.json"
+    eu:
+      CSAccountNumber: "292230061137"
+      StackName: "CrowdStrike-CSPM-Integration"
+      StackNameEb: "CrowdStrike-CSPM-Integration-EB"
+      StackNameRootEb: "CrowdStrike-CSPM-Integration-Root-EB"
+      CSRoleName: "CrowdStrikeCSPMConnector"
+      cf: "https://cs-prod-cloudconnect-templates.s3.amazonaws.com/aws_cspm_cloudformation_v2.json"
+      cfiam: "https://cs-prod-cloudconnect-templates.s3.amazonaws.com/aws_cspm_cloudformation_iam_v2.json"
+      cfeb: "https://cs-prod-cloudconnect-templates.s3.amazonaws.com/aws_cspm_cloudformation_eb_v2.json"
+
+Resources:
+
+  FalconpyLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+        - python3.7
+      Content:
+        S3Bucket: !Ref "bucket"
+        #        S3Bucket: !FindInMap [ S3perRegion, !Ref "AWS::Region", NAME ]
+        S3Key: falconpy-layer.zip
+      Description: Layer for requests package
+      LayerName: falconpy-package
+
+  CrowdStrikeCredentials:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: CrowdStrike Credentials
+      Name: !Join
+        - '-'
+        - - CrowdStrikeHorizonAPISecret
+          - !Ref 'AWS::StackName'
+      SecretString:
+        Fn::Join:
+          - ''
+          - - '{"FalconClientId":"'
+            - Ref: "FalconClientID"
+            - '","FalconSecret": "'
+            - Ref: FalconSecret
+            - '"}'
+  #
+  # IAM Roles
+  #
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AWSCloudFormationStackSetExecutionRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !Ref AWS::AccountId
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AdministratorAccess
+  AdministrationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AWSCloudFormationStackSetAdministrationRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: AssumeRole-AWSCloudFormationStackSetExecutionRole
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource:
+                  - "arn:*:iam::*:role/AWSCloudFormationStackSetExecutionRole"
+  #
+  # Copy zip files to local bucket to support QuickStarts
+  #
+  CopyZipsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Path: /
+      Policies:
+        - PolicyName: lambda-copier
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectTagging
+                Resource:
+                  - !Sub 'arn:aws:s3:::${QSS3BucketName}/${QSS3KeyPrefix}*'
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:PutObjectTagging
+                Resource:
+                  - !Sub 'arn:aws:s3:::${LambdaZipsBucket}/${QSS3KeyPrefix}*'
+  #
+  # Creates a CloudFormation Stack 'CrowdStrike-CSPM-Integration in the Master account
+  #
+  CrowdStrikeIOMSetupLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join
+        - '-'
+        - - CrowdStrikeIOMSetupLambdaRole
+          - !Ref 'AWS::StackName'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+            Condition: { }
+      Path: /
+      Policies:
+        - PolicyName: CloudFormation_ops
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              Sid: CFTPolicy
+              Effect: Allow
+              Action:
+                - cloudformation:CreateStack
+                - cloudformation:ListStacks
+                - cloudformation:DeleteStack
+              Resource:
+                - !Join [ ':', [ 'arn:aws:cloudformation', !Ref "AWS::Region", !Ref "AWS::AccountId", 'stack/CrowdStrike-CSPM*' ] ]
+        - PolicyName: IAM_ops
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              Sid: IAMPolicy
+              Effect: Allow
+              Action:
+                - iam:GetPolicyVersion
+                - iam:GetRole
+                - iam:GetPolicy
+                - iam:DeleteRolePolicy
+                - iam:CreateRole
+                - iam:DeleteRole
+                - iam:PutRolePolicy
+                - iam:GetRolePolicy
+              Resource:
+                - !Join [ ':', [ 'arn:aws:iam:', !Ref "AWS::AccountId", 'role/CrowdStrikeCSPMEventBridge' ] ]
+                - !Join [ ':', [ 'arn:aws:iam:', !Ref "AWS::AccountId", 'role/CrowdStrikeCSPMReader-*' ] ]
+                - !Join [ ':', [ 'arn:aws:iam:', !Ref "AWS::AccountId", 'policy/*' ] ]
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+  #
+  # Lambda Acct Registration Function Role.  Makes an API call to CrowdStrike
+  # Response payload contains input Parameters for the template
+  #
+  CrowdStrikeCSPMRegistrationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join
+        - '-'
+        - - CrowdStrikeCSPMRegistrationRole
+          - !Ref 'AWS::StackName'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+            Condition: { }
+      Path: /
+      Policies:
+        - PolicyName: List_secrets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              Sid: VisualEditor2
+              Effect: Allow
+              Action:
+                - secretsmanager:GetResourcePolicy
+                - secretsmanager:GetSecretValue
+                - secretsmanager:DescribeSecret
+                - secretsmanager:ListSecretVersionIds
+              Resource: !Ref CrowdStrikeCredentials
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  #
+  # Org Registration Role
+  #
+  LambdaRegistrationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join
+        - '-'
+        - - CrowdStrikeLambdaCreateStackSetRole
+          - !Ref 'AWS::StackName'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+            Condition: { }
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSOrganizationsReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+  #
+  # Role used to create stacksets in the master account
+  #
+  LambdaToCreateStackSetRole:
+    Type: AWS::IAM::Role
+    Condition: ShouldCreateIOAResources
+    Properties:
+      RoleName: !Join
+        - '-'
+        - - LambdaToCreateStackSetRole
+          - !Ref 'AWS::StackName'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+            Condition: { }
+      Path: /
+      Policies:
+        - PolicyName: Create-Trail
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: GetRoleRW
+                Effect: Allow
+                Action:
+                  - iam:PassRole
+                  - iam:GetRole
+                  - iam:CreateServiceLinkedRole
+                Resource:
+                  - !Join [ ':', [ 'arn:aws:iam:',!Ref "AWS::AccountId", 'role/*' ] ]
+              - Sid: OrgActions
+                Effect: Allow
+                Action:
+                  - organizations:DescribeOrganization
+                  - organizations:ListAWSServiceAccessForOrganization
+                Resource: '*'
+        - PolicyName: Create-Delete-Trail
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: CloudTrialRW
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - cloudtrail:StopLogging
+                  - cloudtrail:StartLogging
+                  - cloudtrail:DeleteTrail
+                  - cloudtrail:CreateTrail
+                Resource:
+                  - !Join [ ':', [ 'arn:aws:cloudtrail',!Ref "AWS::Region", !Ref "AWS::AccountId", 'trail/cs-horizon-org-trail' ] ]
+
+        - PolicyName: Get_Regions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: Regions
+                Effect: Allow
+                Action: ec2:DescribeRegions
+                Resource: '*'
+        - PolicyName: CloudFormation_ops
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              Sid: VisualEditor2
+              Effect: Allow
+              Action:
+                - cloudformation:CreateStackSet
+                - cloudformation:CreateStackInstances
+                - cloudformation:DescribeStackSet
+                - cloudformation:ListStackInstances
+                - cloudformation:DeleteStackInstances
+                - cloudformation:DeleteStackSet
+              Resource:
+                - '*'
+                - !Join [ ':', [ 'arn:aws:cloudformation', !Ref "AWS::Region", !Ref "AWS::AccountId", 'stackset/CrowdStrike-CSPM*' ] ]
+        - PolicyName: Pass_Role
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              Sid: CloudFormation
+              Effect: Allow
+              Action:
+                - iam:PassRole
+              Resource: !Join [ ':', [ 'arn:aws:iam:', !Ref "AWS::AccountId", 'role/service-role/AWSControlTowerStackSetRole' ] ]
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSOrganizationsReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+  #
+  # Lambda Functions
+  #
+  # Registers the AWS Org with CrowdStrike.  Response data contains parameter values for templates
+  #
+  RegisterAccount:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Ref bucket
+        S3Key: 'register_org.zip'
+      #        S3Bucket: !Ref 'LambdaZipsBucket'
+      #        S3Key: !Sub '${QSS3KeyPrefix}register_org.zip'
+      Environment:
+        Variables:
+          SecretRegion: !Ref AWS::Region
+          SecretName: !Join
+            - '-'
+            - - CrowdStrikeHorizonAPISecret
+              - !Ref 'AWS::StackName'
+      Layers: [ !Ref FalconpyLayer ]
+      Handler: register_org.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt "LambdaRegistrationRole.Arn"
+      Runtime: python3.7
+      Timeout: 300
+      FunctionName: !Join
+        - '-'
+        - - CSPMAccount-Registration
+          - !Ref 'AWS::StackName'
+  #
+  # Lambda function to provision/de provision the account with CRWD using a CFT.
+  #
+  IOMSetupRootAcct:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Ref 'bucket'
+        S3Key: 'iom_setup_master.zip'
+      #        S3Bucket: !Ref 'LambdaZipsBucket'
+      #        S3Key: !Sub '${QSS3KeyPrefix}ioa_setup_master.zip'
+      Environment:
+        Variables:
+          AWSRegion: !Ref AWS::Region
+          AWSAccount: !Ref AWS::AccountId
+      Handler: iom_setup_master.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt CrowdStrikeIOMSetupLambdaRole.Arn
+      Runtime: python3.7
+      Timeout: 300
+      FunctionName: !Join
+        - '-'
+        - - CrowdStrikeIOMSetupRootAcct
+          - !Ref 'AWS::StackName'
+
+  #
+  # Lambda function to provision/de provision the account with CRWD using a CFT.
+  #
+  IOASetupRootAcct:
+    Condition: ShouldCreateIOAResources
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Ref 'bucket'
+        S3Key: 'ioa_setup_master.zip'
+      #        S3Bucket: !Ref 'LambdaZipsBucket'
+      #        S3Key: !Sub '${QSS3KeyPrefix}ioa_setup_master.zip'
+      Layers: [ !Ref FalconpyLayer ]
+      Environment:
+        Variables:
+          AdministrationRoleARN: !Join [ ':', [ 'arn:aws:iam:', !Ref 'AWS::AccountId', 'role/service-role/', !Ref ctStackSetAdminRole ] ]
+          ExecutionRoleARN: !Ref executionRoleArn
+          AWSRegion: !Ref AWS::Region
+          EnableIOA: !Ref EnableIOA
+          StackNameRootEb: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, StackNameRootEb ]
+          UseExistingCloudtrail: !Ref UseExistingCloudtrail
+      Handler: ioa_setup_master.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt "LambdaToCreateStackSetRole.Arn"
+      Runtime: python3.7
+      Timeout: 300
+      FunctionName: !Join
+        - '-'
+        - - CrowdStrikeIOASetupRootAcct
+          - !Ref 'AWS::StackName'
+
+  #
+  # Lambda function to provision/de provision the account with CRWD using a CFT.
+  #
+  CreateServiceManagedStackets:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Ref bucket
+        S3Key: 'stackset_setup.zip'
+      #        S3Bucket: !Ref 'LambdaZipsBucket'
+      #        S3Key: !Sub '${QSS3KeyPrefix}register_org.zip'
+      Layers: [ !Ref FalconpyLayer ]
+      Handler: stackset_setup.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt "LambdaToCreateStackSetRole.Arn"
+      Runtime: python3.7
+      Timeout: 300
+      FunctionName: !Join
+        - '-'
+        - - CrowdStrikeStackSetSetup
+          - !Ref 'AWS::StackName'
+  #
+  # Lambda Triggers
+  #
+  #
+  # Invoke lambda function to register the org with CrowdStrike
+  #
+  TriggerRegisterAccountLambda:
+    Type: 'Custom::TriggerLambda'
+    DependsOn:
+      - CrowdStrikeCSPMRegistrationRole
+    Properties:
+      aws_region: !Ref AWS::Region
+      FalconSecret: !Ref FalconSecret
+      FalconClientId: !Ref FalconClientID
+      CSCloud: !Ref CSCloud
+      ServiceToken: !GetAtt
+        - RegisterAccount
+        - Arn
+#  #
+#  # Creates SERVICE_MANAGED IOM MultiRegion StackSet CrowdStrike-CSPM-Integration-EB in the master Account
+#  #
+#  TriggerCreateIAMStacketLambda:
+#    Type: Custom::TriggerLambda
+#    Properties:
+#      ExternalID: !GetAtt TriggerRegisterAccountLambda.external_id
+#      CSRoleName: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, CSRoleName ]
+#      RoleName: !GetAtt TriggerRegisterAccountLambda.iam_role_name
+#      CSAccountNumber: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, CSAccountNumber ]
+#      EnableIOA: !Ref EnableIOA
+#      IAMStackSetURL: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, cfiam ]
+#      IAMStackSetName: 'CrowdStrike-CSPM-Integration'
+#      ServiceToken: !GetAtt
+#        - CreateServiceManagedStackets
+#        - Arn
+##  #
+##  # Creates SERVICE_MANAGED IOA MultiRegion StackSet CrowdStrike-CSPM-Integration in the master Account
+##  #
+  TriggerCreateIOAStacketLambda:
+    Type: Custom::TriggerLambda
+    DependsOn:
+      - LambdaToCreateStackSetRole
+    Properties:
+      CSAccountNumber: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, CSAccountNumber ]
+      CSEventBusName: !GetAtt TriggerRegisterAccountLambda.eventbus_name
+      DefaultEventBusRegion: !Ref AWS::Region
+      IAMStackSetURL: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, cfeb ]
+      IAMStackSetName: 'CrowdStrike-CSPM-Integration-EB'
+      ServiceToken: !GetAtt
+        - CreateServiceManagedStackets
+        - Arn
+##
+##  #
+##  # Creates SELF_MANAGED IOA MultiRegion StackSet CrowdStrike-CSPM-Integration-Root-EB in the master Account
+##  #
+  TriggerIOASetupRootAcctLambda:
+    Condition: ShouldCreateIOAResources
+    Type: 'Custom::TriggerLambda'
+    Properties:
+      CSAccountNumber: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, CSAccountNumber ]
+      CSEventBusName: !GetAtt TriggerRegisterAccountLambda.eventbus_name
+      DefaultEventBusRegion: !Ref AWS::Region
+      IAMStackSetURL: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, cfeb ]
+      IAMStackSetName: 'CrowdStrike-CSPM-Integration-Root-EB'
+      ServiceToken: !GetAtt
+        - IOASetupRootAcct
+        - Arn
+##    #
+##    # Creates a IOM Stack CrowdStrike-CSPM-Integration in the master Account
+##    #
+  TriggerIOMSetupRootAcct:
+    Type: Custom::TriggerLambda
+    Properties:
+      ExternalID: !GetAtt TriggerRegisterAccountLambda.external_id
+      CSRoleName: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, CSRoleName ]
+      RoleName: !GetAtt TriggerRegisterAccountLambda.iam_role_name
+      CSAccountNumber: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, CSAccountNumber ]
+      EnableIOA: !Ref EnableIOA
+      IAMStackURL: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, cfiam ]
+      IAMStackName: 'CrowdStrike-CSPM-Integration'
+      ServiceToken: !GetAtt
+        - IOMSetupRootAcct
+        - Arn
+
+  LambdaZipsBucket:
+    Type: AWS::S3::Bucket
+  #  CopyZips:
+  #    Type: Custom::CopyZips
+  #    Properties:
+  #      ServiceToken: !GetAtt 'CopyZipsFunction.Arn'
+  #      DestBucket: !Ref 'LambdaZipsBucket'
+  #      SourceBucket: !If [UsingDefaultBucket, !Sub '${QSS3BucketName}-${AWS::Region}', !Ref QSS3BucketName]
+  #      Prefix: !Ref 'QSS3KeyPrefix'
+  #      Objects:
+  ##        - functions/packages/falconpy/falconpy-layer.zip
+  ##        - functions/packages/register/register_org.zip
+  ##        - functions/packages/ioasetup/ioa_setup_master.zip
+  ##        - functions/packages/stackset/push_horizon_stackset_lambda.zip
+  #        - falconpy-layer.zip
+  #        - register_org.zip
+  #        - ioa_setup_master.zip
+  #        - push_horizon_stackset_lambda.zip
+
+#  CopyZipsFunction:
+#    Type: AWS::Lambda::Function
+#    Properties:
+#      Description: Copies objects from a source S3 bucket to a destination
+#      Handler: index.handler
+#      Runtime: python3.6
+#      Role: !GetAtt CopyZipsRole.Arn
+#      Timeout: 240
+#      Code:
+#        ZipFile: |
+#          import json
+#          import logging
+#          import threading
+#          import boto3
+#          import cfnresponse
+#          def copy_objects(source_bucket, dest_bucket, prefix, objects):
+#              s3 = boto3.client('s3')
+#              for o in objects:
+#                  key = prefix + o
+#                  copy_source = {
+#                      'Bucket': source_bucket,
+#                      'Key': key
+#                  }
+#                  print('copy_source: %s' % copy_source)
+#                  print('dest_bucket = %s'%dest_bucket)
+#                  print('key = %s' %key)
+#                  s3.copy_object(CopySource=copy_source, Bucket=dest_bucket,
+#                        Key=key)
+#          def delete_objects(bucket, prefix, objects):
+#              s3 = boto3.client('s3')
+#              objects = {'Objects': [{'Key': prefix + o} for o in objects]}
+#              s3.delete_objects(Bucket=bucket, Delete=objects)
+#          def timeout(event, context):
+#              logging.error('Execution is about to time out, sending failure response to CloudFormation')
+#              cfnresponse.send(event, context, cfnresponse.FAILED, {}, None)
+#          def handler(event, context):
+#              # make sure we send a failure to CloudFormation if the function
+#              # is going to timeout
+#              timer = threading.Timer((context.get_remaining_time_in_millis()
+#                        / 1000.00) - 0.5, timeout, args=[event, context])
+#              timer.start()
+#              print('Received event: %s' % json.dumps(event))
+#              status = cfnresponse.SUCCESS
+#              try:
+#                  source_bucket = event['ResourceProperties']['SourceBucket']
+#                  dest_bucket = event['ResourceProperties']['DestBucket']
+#                  prefix = event['ResourceProperties']['Prefix']
+#                  objects = event['ResourceProperties']['Objects']
+#                  if event['RequestType'] == 'Delete':
+#                      delete_objects(dest_bucket, prefix, objects)
+#                  else:
+#                      copy_objects(source_bucket, dest_bucket, prefix, objects)
+#              except Exception as e:
+#                  logging.error('Exception: %s' % e, exc_info=True)
+#                  status = cfnresponse.FAILED
+#              finally:
+#                  timer.cancel()
+#                  cfnresponse.send(event, context, status, {}, None)
+##
+#
