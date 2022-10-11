@@ -100,9 +100,9 @@ def lambda_handler(event, context):
         elif event['RequestType'] in ['Delete']:
             logger.info('Event = ' + event['RequestType'])
             try:
-                CFT.delete_stack(StackName=iam_stackset_name)
+                CFT.delete_stack(StackName=iam_stack_name)
             except Exception as error:
-                logger.info('Error deleting StackSet {}'.format(iam_stackset_name))
+                logger.info('Error deleting StackSet {}'.format(iam_stack_name))
                 pass
             cfnresponse_send(event, context, 'SUCCESS', response_data, "CustomResourcePhysicalID")
 

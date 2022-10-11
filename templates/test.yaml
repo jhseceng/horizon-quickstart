@@ -581,19 +581,19 @@ Resources:
 #  #
 #  # Creates SERVICE_MANAGED IOM MultiRegion StackSet CrowdStrike-CSPM-Integration-EB in the master Account
 #  #
-#  TriggerCreateIAMStacketLambda:
-#    Type: Custom::TriggerLambda
-#    Properties:
-#      ExternalID: !GetAtt TriggerRegisterAccountLambda.external_id
-#      CSRoleName: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, CSRoleName ]
-#      RoleName: !GetAtt TriggerRegisterAccountLambda.iam_role_name
-#      CSAccountNumber: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, CSAccountNumber ]
-#      EnableIOA: !Ref EnableIOA
-#      IAMStackSetURL: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, cfiam ]
-#      IAMStackSetName: 'CrowdStrike-CSPM-Integration'
-#      ServiceToken: !GetAtt
-#        - CreateServiceManagedStackets
-#        - Arn
+  TriggerCreateIAMStacketLambda:
+    Type: Custom::TriggerLambda
+    Properties:
+      ExternalID: !GetAtt TriggerRegisterAccountLambda.external_id
+      CSRoleName: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, CSRoleName ]
+      RoleName: !GetAtt TriggerRegisterAccountLambda.iam_role_name
+      CSAccountNumber: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, CSAccountNumber ]
+      EnableIOA: !Ref EnableIOA
+      IAMStackSetURL: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, cfiam ]
+      IAMStackSetName: 'CrowdStrike-CSPM-Integration'
+      ServiceToken: !GetAtt
+        - CreateServiceManagedStackets
+        - Arn
 ##  #
 ##  # Creates SERVICE_MANAGED IOA MultiRegion StackSet CrowdStrike-CSPM-Integration in the master Account
 ##  #
