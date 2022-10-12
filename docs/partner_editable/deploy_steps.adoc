@@ -31,11 +31,11 @@ Sign in to your AWS Control Tower management account, and launch the AWS CloudFo
 
 2) On the *Specify stack details* page, change the stack name if needed. Review the parameters for the template, and provide values for any parameters that require input. For all other parameters, review the default settings and customize them as necessary.  When you finish reviewing and customizing the parameters, choose *Next*.
 
-NOTE: For details about each parameter, see the link:#_parameter_reference[Parameter reference]section.
+NOTE: For details about each parameter, see the link:#_parameter_reference[Parameter reference] section.
 
 3) Enter the relevant parameter values.
 
-You will require CrowdStrike API keys with CSPM Registration Read + Write scope.  See the link:#_pre_reqs[Pre requisites]section.
+You will require CrowdStrike API keys with CSPM Registration Read + Write scope.  See the link:#_pre_reqs[Pre-requisites] section.
 
 .{partner-product-short-name}Parameters Input
 image::../images/CrowdStrike-CT-params.png[CrowdStrike Parameters, 75%]
@@ -77,3 +77,5 @@ NOTE: It is recommended that the StackSet is setup to target all OUs or the orga
 image::../images/CrowdStrike-CT-ebstackset.png[CrowdStrike StackSets, 75%]
 
 === Removal
+
+For details about removing the template, see the link:#_additional_info[Additional Inforamation] section.
