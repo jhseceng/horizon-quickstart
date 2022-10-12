@@ -8,12 +8,6 @@ Falcon API Key Secret (`FalconSecret`)||CrowdStrike API OAuth2 key SECRET|
 CrowdStrike Cloud (`CSCloud`)||The CrowdStrike Cloud that your CID is hosted in|
 Enable IOA Scanning (`EnableIOA`)|true|Enables IOA scanning by creating EventBridge Forwarding Rules
 |Disable sending cloudtrail events to CrowdStrike (UseExistingCloudtrail)|true|Send Read, List, Describe events to CrowdStrike to enhance IOA detections (Creates additional cloudtrail)
-|===
-.Deployment scope and configuration
-[width="100%",cols="33%,11%,66%",options="header",]
-|===
-|Parameter label (name) |Default value|Description|
-Push IOA StackSet to Master Account (`PushMasterAccountStackset`)|true|Uses a lambda function to create stack instances in the master account in all regions.|
 
 |===
 .AWS Quick Start configuration

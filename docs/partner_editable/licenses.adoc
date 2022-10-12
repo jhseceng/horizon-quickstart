@@ -4,5 +4,6 @@
 
 
 This Quick Start requires that you have access to a CrowdStrike account.  If you do not currently have a CrowdStrike account you can find more details of how to create one here.
+You are also required to have a subscription to CrowdStrikes CNAPP products.
 
-https://aws.amazon.com/marketplace/pp/prodview-l6ti2ml2i2g6y?sr=0-2&ref_=beagle&applicationId=AWSMPContessa
+https://www.crowdstrike.com/press-releases/crowdstrike-introduces-cnapp-capabilities-designed-to-secure-and-protect-cloud-applications/

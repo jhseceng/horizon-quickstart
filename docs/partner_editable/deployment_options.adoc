@@ -1,25 +1,34 @@
+This Quick Start provides three deployment options:
 
-This Quick Start can be deployed as an AWS CloudFormation stack in your AWS Control Tower management account.
 
-WARNING: .
+* *Deploy {partner-product-short-name} Monitoring for Indicators of Misconfiguration with Enhanced Indicator of Attack Monitoring* CrowdStrike scans each account for Misconfigurations on a periodic basis.   CrowdStrike scans for Indicators of Attack by collecting log data from EventBridge (mutating events) and from CloudTrail (non mutating events)
+* *Deploy {partner-product-short-name}Monitoring for Indicators of Misconfiguration with Basic Indicator of Attack Monitoring*. CrowdStrike scans each account for Misconfigurations on a periodic basis.   CrowdStrike scans for Indicators of Attack by collecting log data from EventBridge only(mutating events).  Indicators of Attack are still displayed but will not show any previous recon activity that may be linked to the attack
+* *Monitoring for Indicators of Misconfiguration.* CrowdStrike scans each account for Misconfigurations on a periodic basiss.
 
-Each member account requires the following cloudformation stacks and stacksets
+The Quick Start provides two parameters to Control the deployment.
+
+NOTE: Mutating events include - *Start, Stop, Delete, Update, Put* +
+Non Mutating events include - *List, Read, Show, Describe*
+
+
+
+The template will create the following
 
 |===
-|Resource Type |Permissions Model|Name|Location|Description
+|Resource Type |Permissions Model|Name|Location|Description|Feature|Required/Option
 
 // Space needed to maintain table headers
 |Cloudformation Stack |SELF-MANAGED| CrowdStrike-CSPM-Integration| Master Account
-|Creates an IAM Role used by CrowdStrike to discover resources
+|Creates an IAM Role used by CrowdStrike to discover resources|IOM Scanning|Required
 
 |Cloudformation StackSet | SERVICE-MANAGED|CrowdStrike-CSPM-Integration-Root-EB| Master Account
-|Creates Event Bridge forwarding rules in each every enabled region in the master account
+|Creates Event Bridge forwarding rules in each every enabled region in the master account|IOA Scanning|Option
 
 |Cloudformation StackSet | SERVICE-MANAGED|CrowdStrike-CSPM-Integration| All Org Member Accounts
-|Creates an IAM Role used by CrowdStrike to discover resources
+|Creates an IAM Role used by CrowdStrike to discover resources|IOM Scanning|Required
 
 |Cloudformation StackSet | SERVICE-MANAGED|CrowdStrike-CSPM-Integration-EB| All Org Member Accounts
-|Creates an IAM Role used by CrowdStrike to discover resources
+|Creates an IAM Role used by CrowdStrike to discover resources|IOA Scanning|Option
 |===
 
 
@@ -30,4 +39,4 @@ Each member account requires the following cloudformation stacks and stacksets
 * With automatic deployment enabled, The CrowdStrike StackSets automatically deploys to accounts that are added to the target organization or organizational units (OUs) in the future.
 
 === Existing Accounts
-* An account administrator can create a stack instance in existing accounts using  https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-concepts.html#stacksets-concepts-ops[this procedure^]
+* An account administrator should create a stack instances in existing accounts using  https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-concepts.html#stacksets-concepts-ops[this procedure^]

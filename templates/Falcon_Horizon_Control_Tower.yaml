@@ -24,7 +24,7 @@ Metadata:
           - FalconSecret
           - CSCloud
       - Label:
-          default: Disable Indicator of Attack Scanning (Does not create EventBridge Rules)
+          default: Control Indicator of Attack Scanning 
         Parameters:
           - EnableIOA
           - UseExistingCloudtrail
@@ -49,9 +49,9 @@ Metadata:
       FalconSecret:
         default: Falcon API Key Secret
       EnableIOA:
-        default: Enable IOA Scanning
+        default: Enable IOA Scanning (Adds EventBridge forwarding Rules)
       UseExistingCloudtrail:
-        default: Disable sending cloudtrail events to CrowdStrike
+        default: Disables Cloudtrail forwarding (No recon activity associated with attack)
       CSCloud:
         default: CrowdStrike Cloud
 Conditions:
@@ -348,7 +348,7 @@ Resources:
     Properties:
       RoleName: !Join
         - '-'
-        - - CrowdStrikeLambdaCreateStackSetRole
+        - - 'LambdaRegistrationRole'
           - !Ref 'AWS::StackName'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'

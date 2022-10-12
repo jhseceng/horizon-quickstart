@@ -1,23 +1,18 @@
 :xrefstyle: short
 
-Deploying this Quick Start for a new virtual private cloud (VPC) with
-default parameters builds the following _{partner-product-name}_ environment in the
+Deploying this Quick Start builds the following _{partner-product-name}_ environment in the
 AWS Cloud.
 
 [#CrowdStrike-CT-arch]
 .{partner-product-short-name} architecture diagram
-image::../images/CrowdStrike-CT-arch.png[CrowdStrike AWS Control Tower Integration diagram, 100%]
+image::../images/CrowdStrike-CT-arch.png[CrowdStrike AWS Control Tower Integration diagram, 80%]
 
-The Quick Start sets up the following:
+As shown in <<CrowdStrike-CT-arch>> the template will create the following
 
-Two Service Managed Stacksets that should be applied to each member account in your org. (Excluding the master account)
+1) An IAM role in each account that is assumed by CrowdStrike to discover assets in your account.  CrowdStrike will scan these assets for *Indicators of Misconfiguration*
 
-* Service Managed StackSet containing an IAM role that CrowdStrike will assume in order to monitor assets.
-* Service Managed StackSet containing EventBridge rules that should be applied in each active region.
+2) (Optional but recommended) Creates EventBridge Rules in each active region in each account that will forward cloudtrail events to CrowdStrike.  CrowdStrike uses these events to scan for *Indicators of Misconfiguration*
 
-In addtionn the following resources are created for your master account
+2) (Optional but recommended) Creates an additional *Organization Wide* CloudTrail in the master or delegated account to forward Read events from CloudTrail.
 
-* IAM role that CrowdStrike will assume in order to monitor assets in your master account
-* EventBridge rules in each active region in your master account
-
-
+NOTE: EventBridge does not forward read events today
