@@ -36,8 +36,8 @@ Metadata:
       - Label:
           default: Control Tower Params
         Parameters:
-          - ctStackSetAdminRole
-          - executionRoleArn
+          - "CTAdminRoleName"
+          - "CTExecutionRoleArn"
     ParameterLabels:
       
       QSS3BucketName:
@@ -58,10 +58,10 @@ Conditions:
   ShouldCreateIOAResources: !Equals [ !Ref 'EnableIOA', true ]
   UsingDefaultBucket: !Equals [ !Ref QSS3BucketName, 'aws-quickstart' ]
 Parameters:
-  ctStackSetAdminRole:
+  CTAdminRoleName:
     Type: String
     Default: AWSControlTowerStackSetRole
-  executionRoleArn:
+  CTExecutionRoleArn:
     Type: String
     Default: AWSControlTowerExecution
   bucket:
@@ -144,7 +144,9 @@ Mappings:
       cfeb: "https://cs-prod-cloudconnect-templates.s3.amazonaws.com/aws_cspm_cloudformation_eb_v2.json"
 
 Resources:
-
+  #
+  # Falconpy https://falconpy.io
+  #
   FalconpyLayer:
     Type: AWS::Lambda::LayerVersion
     Properties:
@@ -156,8 +158,10 @@ Resources:
         S3Key: falconpy-layer.zip
       Description: Layer for requests package
       LayerName: falconpy-package
-
-  CrowdStrikeCredentials:
+  #
+  # Key store for CrowdStrike API keys
+  #
+  CrowdStrikeSecrets:
     Type: AWS::SecretsManager::Secret
     Properties:
       Description: CrowdStrike Credentials
@@ -174,9 +178,9 @@ Resources:
             - Ref: FalconSecret
             - '"}'
   #
-  # IAM Roles
+  # IAM Roles required for SELF_MANAGED StackSets
   #
-  ExecutionRole:
+  SelfManagedStackSetExecutionRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName: AWSCloudFormationStackSetExecutionRole
@@ -324,18 +328,14 @@ Resources:
             Condition: { }
       Path: /
       Policies:
-        - PolicyName: List_secrets
+        - PolicyName: CrowdStrikeApiSecretPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: 2012-10-17
             Statement:
-              Sid: VisualEditor2
-              Effect: Allow
-              Action:
-                - secretsmanager:GetResourcePolicy
-                - secretsmanager:GetSecretValue
-                - secretsmanager:DescribeSecret
-                - secretsmanager:ListSecretVersionIds
-              Resource: !Ref CrowdStrikeCredentials
+              - Effect: Allow
+                Action:
+                  - 'secretsmanager:GetSecretValue'
+                Resource: arn:aws:secretsmanager:*:*:secret:CrowdStrikeHorizonAPISecret-*
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/AWSOrganizationsReadOnlyAccess
@@ -368,7 +368,6 @@ Resources:
   #
   LambdaToCreateStackSetRole:
     Type: AWS::IAM::Role
-    Condition: ShouldCreateIOAResources
     Properties:
       RoleName: !Join
         - '-'
@@ -410,12 +409,23 @@ Resources:
                 Effect: Allow
                 Action:
                   - s3:PutObject
+                  - cloudtrail:ListTrails
                   - cloudtrail:StopLogging
                   - cloudtrail:StartLogging
                   - cloudtrail:DeleteTrail
                   - cloudtrail:CreateTrail
                 Resource:
                   - !Join [ ':', [ 'arn:aws:cloudtrail',!Ref "AWS::Region", !Ref "AWS::AccountId", 'trail/cs-horizon-org-trail' ] ]
+        - PolicyName: List-Trails
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ListTrail
+                Effect: Allow
+                Action:
+                  - cloudtrail:ListTrails
+                Resource:
+                  - '*'
 
         - PolicyName: Get_Regions
           PolicyDocument:
@@ -461,12 +471,14 @@ Resources:
   #
   RegisterAccount:
     Type: AWS::Lambda::Function
+    DependsOn:
+      - CrowdStrikeSecrets
     Properties:
       Code:
         S3Bucket: !Ref bucket
-        S3Key: 'register_org.zip'
+        S3Key: 'register_organization.zip'
       #        S3Bucket: !Ref 'LambdaZipsBucket'
-      #        S3Key: !Sub '${QSS3KeyPrefix}register_org.zip'
+      #        S3Key: !Sub '${QSS3KeyPrefix}register_organization.zip'
       Environment:
         Variables:
           SecretRegion: !Ref AWS::Region
@@ -475,14 +487,14 @@ Resources:
             - - CrowdStrikeHorizonAPISecret
               - !Ref 'AWS::StackName'
       Layers: [ !Ref FalconpyLayer ]
-      Handler: register_org.lambda_handler
+      Handler: register_organization.lambda_handler
       MemorySize: 128
       Role: !GetAtt "CrowdStrikeCSPMRegistrationRole.Arn"
       Runtime: python3.7
       Timeout: 300
       FunctionName: !Join
         - '-'
-        - - CSPMAccount-Registration
+        - - CrowdStrike-Account-Registration
           - !Ref 'AWS::StackName'
   #
   # Lambda function to provision/de provision the account with CRWD using a CFT.
@@ -506,7 +518,7 @@ Resources:
       Timeout: 300
       FunctionName: !Join
         - '-'
-        - - CrowdStrikeIOMSetupRootAcct
+        - - CrowdStrike-IOMSetup-RootAcct
           - !Ref 'AWS::StackName'
 
   #
@@ -524,12 +536,11 @@ Resources:
       Layers: [ !Ref FalconpyLayer ]
       Environment:
         Variables:
-          AdministrationRoleARN: !Join [ ':', [ 'arn:aws:iam:', !Ref 'AWS::AccountId', 'role/service-role/', !Ref ctStackSetAdminRole ] ]
-          ExecutionRoleARN: !Ref executionRoleArn
+          AdministrationRoleARN: !Join [ ':', [ 'arn:aws:iam:', !Ref 'AWS::AccountId', 'role/service-role/', "CTAdminRoleName" ] ]
+          ExecutionRoleARN: !Ref CTExecutionRoleArn
           AWSRegion: !Ref AWS::Region
-          EnableIOA: !Ref EnableIOA
-          StackNameRootEb: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, StackNameRootEb ]
-          UseExistingCloudtrail: !Ref UseExistingCloudtrail
+          AWSAccount: !Ref AWS::AccountId
+
       Handler: ioa_setup_master.lambda_handler
       MemorySize: 128
       Role: !GetAtt "LambdaToCreateStackSetRole.Arn"
@@ -537,7 +548,7 @@ Resources:
       Timeout: 300
       FunctionName: !Join
         - '-'
-        - - CrowdStrikeIOASetupRootAcct
+        - - CrowdStrike-IOASetup-RootAcct
           - !Ref 'AWS::StackName'
 
   #
@@ -550,7 +561,7 @@ Resources:
         S3Bucket: !Ref bucket
         S3Key: 'stackset_setup.zip'
       #        S3Bucket: !Ref 'LambdaZipsBucket'
-      #        S3Key: !Sub '${QSS3KeyPrefix}register_org.zip'
+      #        S3Key: !Sub '${QSS3KeyPrefix}register_organization.zip'
       Layers: [ !Ref FalconpyLayer ]
       Handler: stackset_setup.lambda_handler
       MemorySize: 128
@@ -559,7 +570,7 @@ Resources:
       Timeout: 300
       FunctionName: !Join
         - '-'
-        - - CrowdStrikeStackSetSetup
+        - - CrowdStrike-ServiceManaged-StackSet-Setup
           - !Ref 'AWS::StackName'
   #
   # Lambda Triggers
@@ -571,6 +582,7 @@ Resources:
     Type: 'Custom::TriggerLambda'
     DependsOn:
       - CrowdStrikeCSPMRegistrationRole
+      - CrowdStrikeSecrets
     Properties:
       aws_region: !Ref AWS::Region
       FalconSecret: !Ref FalconSecret
@@ -580,7 +592,7 @@ Resources:
         - RegisterAccount
         - Arn
 #  #
-#  # Creates SERVICE_MANAGED IOM MultiRegion StackSet CrowdStrike-CSPM-Integration-EB in the master Account
+#  # Creates SERVICE_MANAGED IOM MultiRegion StackSet CrowdStrike-CSPM-Integration-EB
 #  #
   TriggerCreateIAMStacketLambda:
     Type: Custom::TriggerLambda
@@ -596,9 +608,10 @@ Resources:
         - CreateServiceManagedStackets
         - Arn
 ##  #
-##  # Creates SERVICE_MANAGED IOA MultiRegion StackSet CrowdStrike-CSPM-Integration in the master Account
+##  # Creates SERVICE_MANAGED IOA MultiRegion StackSet CrowdStrike-CSPM-Integration
 ##  #
   TriggerCreateIOAStacketLambda:
+    Condition: ShouldCreateIOAResources
     Type: Custom::TriggerLambda
     DependsOn:
       - LambdaToCreateStackSetRole
@@ -624,6 +637,9 @@ Resources:
       DefaultEventBusRegion: !Ref AWS::Region
       IAMStackSetURL: !FindInMap [ CrowdStrikeCSPMRoleTemplateURL, !Ref CSCloud, cfeb ]
       IAMStackSetName: 'CrowdStrike-CSPM-Integration-Root-EB'
+      CloudTrailBucket: !GetAtt TriggerRegisterAccountLambda.aws_cloudtrail_bucket_name
+      UseExistingCloudtrail: !Ref UseExistingCloudtrail
+      EnableIOA: !Ref EnableIOA
       ServiceToken: !GetAtt
         - IOASetupRootAcct
         - Arn
@@ -655,11 +671,11 @@ Resources:
   #      Prefix: !Ref 'QSS3KeyPrefix'
   #      Objects:
   ##        - functions/packages/falconpy/falconpy-layer.zip
-  ##        - functions/packages/register/register_org.zip
+  ##        - functions/packages/register/register_organization.zip
   ##        - functions/packages/ioasetup/ioa_setup_master.zip
   ##        - functions/packages/stackset/push_horizon_stackset_lambda.zip
   #        - falconpy-layer.zip
-  #        - register_org.zip
+  #        - register_organization.zip
   #        - ioa_setup_master.zip
   #        - push_horizon_stackset_lambda.zip
 

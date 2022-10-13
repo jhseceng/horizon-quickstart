@@ -1,0 +1,39 @@
+:xrefstyle: short
+Customers use AWS Control Tower Account Factory to create a new AWS account or enroll existing AWS accounts in their AWS Organizations. Customers launch Account Factory from the AWS Control Tower console or via AWS Service Catalog API.
+
+CrowdStrike increasingly see its Customers adopting AWS Control Tower due to the benefits it offers. AWS Control Tower provides the easiest way to set up and govern a secure, multi-account AWS environment.
+
+CrowdStrike have integrated its Horizon product with AWS Control Tower to allow customers to easily combine AWS and CrowdStrike security tools,
+
+Horizon delivers continuous agentless discovery and visibility of cloud-native assets from the host to the cloud, providing valuable context and insights into the overall security posture and the actions required to prevent potential security incidents.
+
+Horizon also provides intelligent agentless monitoring of cloud resources to detect misconfigurations , vulnerabilities and security threats, along with guided remediation to resolve security risks and enable developers with guardrails to avoid costly mistakes.
+
+CrowdStrikes adversary-focused approach provides real-time threat intelligence on 150+ adversary groups, 50+ IOA detections and guided remediation that improves investigation speed by up to 88%, enabling teams to respond faster and stop breaches.
+
+CrowdStrike Falcon Horizon performs the following core actions:
+
+Observe: EventBridge streams CloudTrail logs across accounts to the CrowdStrike platform as activity occurs.
+
+Detect: Falcon Horizon invokes indicators of attack (IOA) detection algorithms that reveal adversarial or anomalous activities from the log file streams. It correlates new and historical events in real time while enriching the events with CrowdStrike threat intelligence data. Each IOA is prioritized with the likelihood of activity being malicious via scoring and mapped to the MITRE ATT&CK framework.
+
+Remediate: The detected IOA is presented with remediation steps. Depending on the score, applying the remediations quickly can be critical before the attack spreads.
+
+Prevent: Unremediated insecure configurations are revealed via indicators of misconfiguration (IOM) in Falcon Horizon. Applying the remediation steps from IOM can prevent future breaches.
+
+
+Deploying this Quick Start builds the following _{partner-product-name}_ environment in the
+AWS Cloud.
+
+[#CrowdStrike-CT-arch]
+.{partner-product-short-name} architecture diagram
+image::../images/CrowdStrike-CT-arch.png[CrowdStrike AWS Control Tower Integration diagram, 80%]
+
+As shown in <<CrowdStrike-CT-arch>> the template will create the following
+
+1) An IAM role in each account that is assumed by CrowdStrike to discover assets in your account.  CrowdStrike will scan these assets for *Indicators of Misconfiguration*
+
+2) Creates EventBridge Rules in each active region in each account that will forward cloudtrail events to CrowdStrike.  CrowdStrike uses these events to scan for *Indicators of Attack*
+
+2) (Optional but recommended) Creates an additional *Organization Wide* CloudTrail in the master or delegated account to forward Read events from CloudTrail.
+

@@ -5,3 +5,7 @@
 
 *A.* If the AWS CloudFormation fails to create the stack, relaunch the template with *Rollback on failure* set to *Disabled*. This setting is in the AWS CloudFormation console under *Advanced* on the *Configure stack options* page. With this setting, the stack’s state is retained, and the instance remains running so you can troubleshoot the issue.  Also, see Amazon CloudWatch for errors associated with the AWS Lambda functions.
 
+*Q.* My Stack creation fails at `TriggerRegisterAccountLambda` with CREATE_FAILED.
+
+*A.* The organization registration process has failed.  Check your API key values and that the org is not already registered in your CID or another CID.
+
