@@ -192,9 +192,10 @@ def trail_exists():
     if len(trail_list) > 0:
         for trail in trail_list:
             if trail['Name'] == CLOUDTRAIL_NAME:
+                logger.info('**** CloudTrail {} exists already ****'.format(CLOUDTRAIL_NAME))
                 return True
-    else:
-        logger.info('No trails appear to exist')
+            else:
+                logger.info('**** CloudTrail {} does not exist ****'.format(CLOUDTRAIL_NAME))
     return False
 
 

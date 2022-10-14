@@ -8,13 +8,8 @@ Description: This template will create 3 StackSets and one Stack in your master 
   created in your organisation.   Administrators should apply these manually to existing accounts.
   3) Cloudformation StackSet CrowdStrike-CSPM-Integration will be created in the master account.
   4) CrowdStrike-CSPM-Integration-EB will be created in the master account
-Metadata:
-  cfn-lint:
-    config:
-      ignore_checks:
-        - E3002 # Concurrency for StackSet
-        - W1001 # Resource not required if not using IOA Scanning
 
+Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
@@ -56,7 +51,6 @@ Metadata:
         default: CrowdStrike Cloud
 Conditions:
   ShouldCreateIOAResources: !Equals [ !Ref 'EnableIOA', true ]
-  UsingDefaultBucket: !Equals [ !Ref QSS3BucketName, 'aws-quickstart' ]
 Parameters:
   CTAdminRoleName:
     Type: String
@@ -64,8 +58,6 @@ Parameters:
   CTExecutionRoleArn:
     Type: String
     Default: AWSControlTowerExecution
-  bucket:
-    Type: String
   FalconClientID:
     Description: Your Falcon OAuth2 Client ID.
     NoEcho: 'true'
@@ -148,14 +140,14 @@ Resources:
   # Falconpy https://falconpy.io
   #
   FalconpyLayer:
+    DependsOn: CopyZips
     Type: AWS::Lambda::LayerVersion
     Properties:
       CompatibleRuntimes:
         - python3.7
       Content:
-        S3Bucket: !Ref "bucket"
-        #        S3Bucket: !FindInMap [ S3perRegion, !Ref "AWS::Region", NAME ]
-        S3Key: falconpy-layer.zip
+        S3Bucket: !Ref 'LambdaZipsBucket'
+        S3Key: !Sub '${QSS3KeyPrefix}falconpy-layer.zip'
       Description: Layer for requests package
       LayerName: falconpy-package
   #
@@ -219,40 +211,6 @@ Resources:
                   - sts:AssumeRole
                 Resource:
                   - "arn:*:iam::*:role/AWSCloudFormationStackSetExecutionRole"
-  #
-  # Copy zip files to local bucket to support QuickStarts
-  #
-  CopyZipsRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Path: /
-      Policies:
-        - PolicyName: lambda-copier
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:GetObjectTagging
-                Resource:
-                  - !Sub 'arn:aws:s3:::${QSS3BucketName}/${QSS3KeyPrefix}*'
-              - Effect: Allow
-                Action:
-                  - s3:PutObject
-                  - s3:DeleteObject
-                  - s3:PutObjectTagging
-                Resource:
-                  - !Sub 'arn:aws:s3:::${LambdaZipsBucket}/${QSS3KeyPrefix}*'
   #
   # Creates a CloudFormation Stack 'CrowdStrike-CSPM-Integration in the Master account
   #
@@ -339,30 +297,6 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/AWSOrganizationsReadOnlyAccess
-
-  #
-  # Org Registration Role
-  #
-  LambdaRegistrationRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Join
-        - '-'
-        - - 'LambdaRegistrationRole'
-          - !Ref 'AWS::StackName'
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-            Condition: { }
-      Path: /
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-        - arn:aws:iam::aws:policy/AWSOrganizationsReadOnlyAccess
-        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
   #
   # Role used to create stacksets in the master account
   #
@@ -473,12 +407,11 @@ Resources:
     Type: AWS::Lambda::Function
     DependsOn:
       - CrowdStrikeSecrets
+      - CopyZips
     Properties:
       Code:
-        S3Bucket: !Ref bucket
-        S3Key: 'register_organization.zip'
-      #        S3Bucket: !Ref 'LambdaZipsBucket'
-      #        S3Key: !Sub '${QSS3KeyPrefix}register_organization.zip'
+        S3Bucket: !Ref 'LambdaZipsBucket'
+        S3Key: !Sub '${QSS3KeyPrefix}register_organization.zip'
       Environment:
         Variables:
           SecretRegion: !Ref AWS::Region
@@ -500,13 +433,12 @@ Resources:
   # Lambda function to provision/de provision the account with CRWD using a CFT.
   #
   IOMSetupRootAcct:
+    DependsOn: CopyZips
     Type: AWS::Lambda::Function
     Properties:
       Code:
-        S3Bucket: !Ref 'bucket'
-        S3Key: 'iom_setup_master.zip'
-      #        S3Bucket: !Ref 'LambdaZipsBucket'
-      #        S3Key: !Sub '${QSS3KeyPrefix}ioa_setup_master.zip'
+        S3Bucket: !Ref 'LambdaZipsBucket'
+        S3Key: !Sub '${QSS3KeyPrefix}iom_setup_master.zip'
       Environment:
         Variables:
           AWSRegion: !Ref AWS::Region
@@ -520,23 +452,22 @@ Resources:
         - '-'
         - - CrowdStrike-IOMSetup-RootAcct
           - !Ref 'AWS::StackName'
-
   #
   # Lambda function to provision/de provision the account with CRWD using a CFT.
   #
   IOASetupRootAcct:
+    DependsOn: CopyZips
     Condition: ShouldCreateIOAResources
     Type: AWS::Lambda::Function
     Properties:
+      DependsOn: CopyZips
       Code:
-        S3Bucket: !Ref 'bucket'
-        S3Key: 'ioa_setup_master.zip'
-      #        S3Bucket: !Ref 'LambdaZipsBucket'
-      #        S3Key: !Sub '${QSS3KeyPrefix}ioa_setup_master.zip'
+        S3Bucket: !Ref 'LambdaZipsBucket'
+        S3Key: !Sub '${QSS3KeyPrefix}ioa_setup_master.zip'
       Layers: [ !Ref FalconpyLayer ]
       Environment:
         Variables:
-          AdministrationRoleARN: !Join [ ':', [ 'arn:aws:iam:', !Ref 'AWS::AccountId', 'role/service-role/', "CTAdminRoleName" ] ]
+          AdministrationRoleARN: !Join [ ':', [ 'arn:aws:iam:', !Ref 'AWS::AccountId', 'role/service-role/', !Ref CTAdminRoleName ] ]
           ExecutionRoleARN: !Ref CTExecutionRoleArn
           AWSRegion: !Ref AWS::Region
           AWSAccount: !Ref AWS::AccountId
@@ -550,18 +481,16 @@ Resources:
         - '-'
         - - CrowdStrike-IOASetup-RootAcct
           - !Ref 'AWS::StackName'
-
   #
   # Lambda function to provision/de provision the account with CRWD using a CFT.
   #
   CreateServiceManagedStackets:
+    DependsOn: CopyZips
     Type: AWS::Lambda::Function
     Properties:
       Code:
-        S3Bucket: !Ref bucket
-        S3Key: 'stackset_setup.zip'
-      #        S3Bucket: !Ref 'LambdaZipsBucket'
-      #        S3Key: !Sub '${QSS3KeyPrefix}register_organization.zip'
+        S3Bucket: !Ref 'LambdaZipsBucket'
+        S3Key: !Sub '${QSS3KeyPrefix}stackset_setup.zip'
       Layers: [ !Ref FalconpyLayer ]
       Handler: stackset_setup.lambda_handler
       MemorySize: 128
@@ -662,80 +591,103 @@ Resources:
 
   LambdaZipsBucket:
     Type: AWS::S3::Bucket
-  #  CopyZips:
-  #    Type: Custom::CopyZips
-  #    Properties:
-  #      ServiceToken: !GetAtt 'CopyZipsFunction.Arn'
-  #      DestBucket: !Ref 'LambdaZipsBucket'
-  #      SourceBucket: !If [UsingDefaultBucket, !Sub '${QSS3BucketName}-${AWS::Region}', !Ref QSS3BucketName]
-  #      Prefix: !Ref 'QSS3KeyPrefix'
-  #      Objects:
-  ##        - functions/packages/falconpy/falconpy-layer.zip
-  ##        - functions/packages/register/register_organization.zip
-  ##        - functions/packages/ioasetup/ioa_setup_master.zip
-  ##        - functions/packages/stackset/push_horizon_stackset_lambda.zip
-  #        - falconpy-layer.zip
-  #        - register_organization.zip
-  #        - ioa_setup_master.zip
-  #        - push_horizon_stackset_lambda.zip
-
-#  CopyZipsFunction:
-#    Type: AWS::Lambda::Function
-#    Properties:
-#      Description: Copies objects from a source S3 bucket to a destination
-#      Handler: index.handler
-#      Runtime: python3.6
-#      Role: !GetAtt CopyZipsRole.Arn
-#      Timeout: 240
-#      Code:
-#        ZipFile: |
-#          import json
-#          import logging
-#          import threading
-#          import boto3
-#          import cfnresponse
-#          def copy_objects(source_bucket, dest_bucket, prefix, objects):
-#              s3 = boto3.client('s3')
-#              for o in objects:
-#                  key = prefix + o
-#                  copy_source = {
-#                      'Bucket': source_bucket,
-#                      'Key': key
-#                  }
-#                  print('copy_source: %s' % copy_source)
-#                  print('dest_bucket = %s'%dest_bucket)
-#                  print('key = %s' %key)
-#                  s3.copy_object(CopySource=copy_source, Bucket=dest_bucket,
-#                        Key=key)
-#          def delete_objects(bucket, prefix, objects):
-#              s3 = boto3.client('s3')
-#              objects = {'Objects': [{'Key': prefix + o} for o in objects]}
-#              s3.delete_objects(Bucket=bucket, Delete=objects)
-#          def timeout(event, context):
-#              logging.error('Execution is about to time out, sending failure response to CloudFormation')
-#              cfnresponse.send(event, context, cfnresponse.FAILED, {}, None)
-#          def handler(event, context):
-#              # make sure we send a failure to CloudFormation if the function
-#              # is going to timeout
-#              timer = threading.Timer((context.get_remaining_time_in_millis()
-#                        / 1000.00) - 0.5, timeout, args=[event, context])
-#              timer.start()
-#              print('Received event: %s' % json.dumps(event))
-#              status = cfnresponse.SUCCESS
-#              try:
-#                  source_bucket = event['ResourceProperties']['SourceBucket']
-#                  dest_bucket = event['ResourceProperties']['DestBucket']
-#                  prefix = event['ResourceProperties']['Prefix']
-#                  objects = event['ResourceProperties']['Objects']
-#                  if event['RequestType'] == 'Delete':
-#                      delete_objects(dest_bucket, prefix, objects)
-#                  else:
-#                      copy_objects(source_bucket, dest_bucket, prefix, objects)
-#              except Exception as e:
-#                  logging.error('Exception: %s' % e, exc_info=True)
-#                  status = cfnresponse.FAILED
-#              finally:
-#                  timer.cancel()
-#                  cfnresponse.send(event, context, status, {}, None)
-##
-#
+  CopyZips:
+    Type: Custom::CopyZips
+    Properties:
+      ServiceToken: !GetAtt 'CopyZipsFunction.Arn'
+      DestBucket: !Ref 'LambdaZipsBucket'
+      SourceBucket: !Ref 'QSS3BucketName'
+      Prefix: !Ref 'QSS3KeyPrefix'
+      Objects:
+        - falconpy-layer.zip
+        - ioa_setup_master.zip
+        - iom_setup_master.zip
+        - register_organization.zip
+        - stackset_setup.zip
+  CopyZipsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Path: /
+      Policies:
+        - PolicyName: lambda-copier
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub 'arn:aws:s3:::${QSS3BucketName}/${QSS3KeyPrefix}*'
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub 'arn:aws:s3:::${LambdaZipsBucket}/${QSS3KeyPrefix}*'
+  CopyZipsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Copies objects from a source S3 bucket to a destination
+      Handler: index.handler
+      Runtime: python3.7
+      Role: !GetAtt 'CopyZipsRole.Arn'
+      Timeout: 240
+      Code:
+        ZipFile: |
+          import json
+          import logging
+          import threading
+          import boto3
+          import cfnresponse
+          def copy_objects(source_bucket, dest_bucket, prefix, objects):
+              s3 = boto3.client('s3')
+              for o in objects:
+                  key = prefix + o
+                  copy_source = {
+                      'Bucket': source_bucket,
+                      'Key': key
+                  }
+                  print(('copy_source: %s' % copy_source))
+                  print(('dest_bucket = %s'%dest_bucket))
+                  print(('key = %s' %key))
+                  s3.copy_object(CopySource=copy_source, Bucket=dest_bucket,
+                        Key=key)
+          def delete_objects(bucket, prefix, objects):
+              s3 = boto3.client('s3')
+              objects = {'Objects': [{'Key': prefix + o} for o in objects]}
+              s3.delete_objects(Bucket=bucket, Delete=objects)
+          def timeout(event, context):
+              logging.error('Execution is about to time out, sending failure response to CloudFormation')
+              cfnresponse.send(event, context, cfnresponse.FAILED, {}, None)
+          def handler(event, context):
+              # make sure we send a failure to CloudFormation if the function
+              # is going to timeout
+              timer = threading.Timer((context.get_remaining_time_in_millis()
+                        / 1000.00) - 0.5, timeout, args=[event, context])
+              timer.start()
+              print(('Received event: %s' % json.dumps(event)))
+              status = cfnresponse.SUCCESS
+              try:
+                  source_bucket = event['ResourceProperties']['SourceBucket']
+                  dest_bucket = event['ResourceProperties']['DestBucket']
+                  prefix = event['ResourceProperties']['Prefix']
+                  objects = event['ResourceProperties']['Objects']
+                  if event['RequestType'] == 'Delete':
+                      delete_objects(dest_bucket, prefix, objects)
+                  else:
+                      copy_objects(source_bucket, dest_bucket, prefix, objects)
+              except Exception as e:
+                  logging.error('Exception: %s' % e, exc_info=True)
+                  status = cfnresponse.FAILED
+              finally:
+                  timer.cancel()
+                  cfnresponse.send(event, context, status, {}, None)
